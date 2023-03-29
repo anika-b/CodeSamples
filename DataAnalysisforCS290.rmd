@@ -1,0 +1,257 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load-packages, message = FALSE}
+library(tidyverse)
+library(knitr)
+library(ggplot2)
+library(broom)
+library(ltm)
+```
+
+```{r reading, echo = FALSE}
+CS307 <- read_csv("Scored_Duvall_CS_Indep_Study.csv", show_col_types = FALSE)
+CS307 <- CS307 %>%
+  add_column(Class = "CS307")
+
+CS216_1 <- read_csv("Scored_CS216_Indep_Study_PreTest.csv", show_col_types = FALSE)
+Groups_216 <- read_csv("Deidentified_CS216_ProjectGroupType.csv", show_col_types = FALSE)
+
+CS216 <- inner_join(CS216_1, Groups_216, by = 'ResearchID')
+CS216 <- CS216 %>%
+  add_column(Class = "CS216")
+
+CS307_post <- read_csv("Duvall_FA22_post_deidentified.csv", show_col_types = FALSE)
+CS307_post <- CS307_post %>%
+  add_column(Class = "CS307")
+CS216_post_1 <- read_csv("216_FA22_post_deidentified.csv", show_col_types = FALSE)
+
+CS216_post <- inner_join(CS216_post_1, Groups_216, by = 'ResearchID')
+CS216_post <- CS216_post %>%
+  add_column(Class = "CS216")
+
+all_data <- full_join(CS307, CS216)
+#all_data <- all_data[-c(1), ] 
+
+all_data_post <- full_join(CS307_post, CS216_post)
+all_data_post <- all_data_post[-c(1), ] 
+```
+
+```{r checking data}
+all_data %>%
+  count(race)
+all_data <- rename(all_data, atgw = 'Score for Attitudes Toward Group Work Scale', ald = 'Active Learning Discomfort Score', prg = 'Score for Peer Review Grading Scale', gc = 'Group Composition Scale', rwa = 'Real-World Application Scale', overall = 'Overall evaluation of group work Scale', egos = 'Extrinsic Goal Orientation Score', igos = 'Intrinsic Goal Orientation Score', task_val = 'Task Value Score', self_eff = 'Expectancy Component: Self-efficacy for Learning and Performance Score', hs = 'Help Seeking Score')
+```
+
+```{r renaming post data}
+all_data_post <- rename(all_data_post, atgw = 'Score for Attitudes Toward Group Work Scale', prg = 'Score for Peer Review Grading Scale', gc = 'Group Composition Scale', rwa = 'Real-World Application Scale', overall = 'Overall evaluation of group work Scale')
+```
+
+```{r editing data}
+all_data <- all_data %>%
+  mutate(GroupType = if_else(GroupType == "Random", "Assigned", GroupType)) %>%
+  mutate(gender_new = if_else(race == "1" | race == "1,5" | gender == "1,7" | gender == "6", "1", "2")) %>%
+  mutate(gender_new = if_else(is.na(gender_new), "2", gender_new)) %>%
+  mutate(race_minority2 = if_else(race_2 == "1" | race_3 == "1"  | race_4 == "1" | race_6 == "1" | race_7 == "1", "mino", "not")) %>%
+  mutate(race_minority = case_when(
+    race == "1,2" | race == "1,2,5" | race == "1,3" | race == "1,5,6"| race == "2,3"| race == "2"| race == "3"| race == "3,5"| race == "4,5"| race == "7" ~ "2",
+    race_minority2 == "mino" ~ "2",
+    TRUE ~ "1"))
+                                   
+  #
+  #mutate(race_minority = if_else(race == "1" | race == "5" | race == "1,5", "1", "2")) %>%
+  #mutate(race_minority = if_else(race_minority2 == "minority" && is.na(race_minority), "2", race_minority)) 
+
+  
+all_data %>%
+  count(race_minority)
+```
+
+```{r atts toward group work and group type}
+model1 <- lm(overall ~ GroupType, data = all_data)
+
+model1 %>% tidy()
+```
+Not a significant relationship
+
+```{r atts toward group work and group type plot}
+ggplot(data = all_data, mapping = aes(x = GroupType, y = overall, fill = Class)) + 
+  geom_boxplot() + 
+  labs(x = "Group Type", y = "Overall Attitude Toward Group Work (OEGW)",
+       title = "Overall Attitude Toward Group Work is Similar for All Groups") +
+  theme(plot.title = element_text(size = 10),
+    axis.title.x = element_text(size = 10),
+    axis.title.y = element_text(size = 10))
+
+all_data %>% 
+  filter (GroupType == "Chosen") %>% 
+  summarise(min = min(overall), 
+            max = max(overall),
+            mean = mean(overall),
+            med = median(overall),
+            sd = sd(overall),
+            q1 = quantile(overall, probs = 0.25), 
+            q3 = quantile(overall, probs = 0.75))
+
+all_data %>% 
+  filter (GroupType == "Assigned") %>% 
+  summarise(min = min(overall), 
+            max = max(overall),
+            mean = mean(overall),
+            med = median(overall),
+            sd = sd(overall),
+            q1 = quantile(overall, probs = 0.25), 
+            q3 = quantile(overall, probs = 0.75))
+
+all_data %>% 
+  filter (GroupType == "Mixed") %>% 
+  summarise(min = min(overall), 
+            max = max(overall),
+            mean = mean(overall),
+            med = median(overall),
+            sd = sd(overall),
+            q1 = quantile(overall, probs = 0.25), 
+            q3 = quantile(overall, probs = 0.75))
+```
+Average overall attitude toward group work is similar for all group types. The mean value is 3.41 for the 'Chosen' group type, 3.24 for the 'Mixed' group type, and 3.26 for the 'Assigned' group type. 
+
+##Should we calculate median etc separately for each class?
+
+
+```{r adding in active learning discomfort}
+model2 <- lm(overall ~ GroupType + ald, data = all_data)
+model2 %>% tidy()
+
+ggplot(data = all_data, mapping = aes(x = ald, y = overall, color = GroupType)) +
+  facet_wrap(~ Class) +
+  geom_smooth() + 
+  labs(x = "Active Learning Discomfort", y = "Overall Attitude Toward Group Work",
+       title = "Differing Relationship Between Discomfort and Attitude Toward Group Work", subtitle = "Based on Group Type") +
+  theme(plot.title = element_text(size = 10),
+        plot.subtitle = element_text(size = 10),
+    axis.title.x = element_text(size = 10),
+    axis.title.y = element_text(size = 10))
+```
+
+For those in the 'Chosen' group type, we can see that there is a negative relationship between active learning discomfort and overall attitude toward group work. This means that those with higher active learning discomfort have more negative attitudes toward group work in comparison to those with lower active learning discomfort as expected. 
+
+For those in the 'Mixed' group type, we can see that the opposite is true. Interestingly, for those in the 'Assigned' instructor-assigned group type, we can see that those with lower and higher active learning discomfort scores have more negative attitudes toward group work in comparison to those with scores toward the middle range. 
+
+
+Last, we examined a linear model with all our dependent variables as below:
+```{r model of all variables}
+full_model <- lm(overall ~ GroupType + Class + ald + prg + gc + rwa + atgw + egos + igos + task_val + hs + self_eff, data = all_data)
+full_model %>% tidy()
+
+reduced_model <- lm(overall ~ atgw + ald + hs, data = all_data)
+                   
+glance(reduced_model) %>% dplyr::select(adj.r.squared)
+```
+Adjusted $R^2$ is the proportion of the variation in the response variable explained by the regression model. If we add enough variables, we can always achieve $R^2$ as 1 (100%). Therefore, we use the adjusted $R^2$, which adjusts for the number of predictor variables in the model and is a measure of the amount of variation in the response that is explained by the regression model.
+
+Importantly, ~55.3% of variation in overall evaluation of group work scores is explained by our three significant predictors -- active learning discomfort, attitudes toward group work, and help-seeking attitudes. 
+
+Variables that are significant are interpreted as below:
+prg: Holding all other variables constant, an increase of 1 point in the Peer Review and Grading construct in the Attitudes Toward Group Work Assignment Scale is expected to result in a 0.35 point increase in Overall Evaluation of Group Work construct on average.
+
+atgw: Holding all other variables constant, an increase of 1 point in the Attitudes Toward Group Work construct in the Attitudes Toward Group Work Assignment Scale is expected to result in a 0.46 point increase in Overall Evaluation of Group Work construct on average.
+
+hs: Holding all other variables constant, an increase of 1 point in the Help Seeking subscale in the MSLQ is expected to result in a 0.073 point increase in Overall Evaluation of Group Work construct on average.
+
+
+```{r cronbach alpha}
+prg_df <- data.frame(all_data$PRG_1, all_data$PRG_2, all_data$PRG_3, all_data$PRG_4, all_data$PRG_5, all_data$PRG_6)
+
+cronbach.alpha(prg_df, CI = TRUE, na.rm = TRUE)
+
+atgw_df <- data.frame(all_data$AGW_1, all_data$AGW_2, all_data$AGW_3, all_data$AGW_4, all_data$AGW_5, all_data$AGW_6)
+
+cronbach.alpha(atgw_df, CI = TRUE, na.rm = TRUE)
+
+gc_df <- data.frame(all_data$GC_1, all_data$GC_2, all_data$GC_3, all_data$GC_4, all_data$GC_5, all_data$GC_6, all_data$GC_7, all_data$GC_8, all_data$GC_9)
+
+cronbach.alpha(gc_df, CI = TRUE, na.rm = TRUE)
+
+rwa_df <- data.frame(all_data$RWA_1, all_data$RWA_2, all_data$RWA_3, all_data$RWA_4, all_data$RWA_5, all_data$RWA_6, all_data$RWA_7, all_data$RWA_8)
+
+cronbach.alpha(rwa_df, CI = TRUE, na.rm = TRUE)
+
+overall_df <- data.frame(all_data$EGW_1, all_data$EGW_2, all_data$EGW_3, all_data$EGW_4, all_data$EGW_5, all_data$EGW_6)
+
+cronbach.alpha(overall_df, CI = TRUE, na.rm = TRUE)
+```
+
+```{r demographic data analysis}
+model2 <- lm(overall ~ GroupType + Class + gender_new + international + parentaleducation + race_minority, data = all_data)
+
+model2 %>% tidy()
+```
+
+The only significant variable was 'international.' No other demographic variable significantly affected overall attitude toward group work. Interesting, those who were international had more positive overall attitudes toward group work.
+
+Holding all other variables constant, overall evaluation toward group work is expected to be 0.25 points higher for international students than domestic students on average.
+
+
+
+
+###Attitudes change over time
+
+```{r atts toward group work and group type - POST}
+model1 <- lm(overall ~ GroupType, data = all_data_post)
+
+model1 %>% tidy()
+```
+Signficant for mixed vs chosen!
+
+```{r atts toward group work and group type plot - POST}
+ggplot(data = all_data_post, mapping = aes(x = GroupType, y = overall, fill = Class)) + 
+  geom_boxplot() + 
+  labs(x = "Group Type", y = "Overall Attitude Toward Group Work (OEGW)",
+       title = "Overall Attitude Toward Group Work is Only Significantly Different for Chosen vs Mixed Groups") +
+  theme(plot.title = element_text(size = 10),
+    axis.title.x = element_text(size = 10),
+    axis.title.y = element_text(size = 10))
+```
+
+```{r atts toward group work change}
+atts_change_1 <- CS216[c('GroupType', 'ResearchID', 'Overall evaluation of group work Scale')]
+atts_change_2 <- CS216_post[c('ResearchID', 'Overall evaluation of group work Scale')]
+
+atts_change <- full_join(atts_change_1, atts_change_2, by = 'ResearchID')
+
+atts_change <- rename(atts_change, pre_overall = 'Overall evaluation of group work Scale.x', post_overall = 'Overall evaluation of group work Scale.y')
+
+atts_change <- atts_change %>%
+  na.omit() %>%
+  mutate(change_in_att = post_overall - pre_overall)
+
+mean_pre = mean(atts_change$pre_overall) 
+mean_post = mean(atts_change$post_overall)
+```
+
+```{r change in atts toward group work and group type plot}
+ggplot(data = atts_change, mapping = aes(x = GroupType, y = change_in_att)) + 
+  geom_boxplot() + 
+  labs(x = "Group Type", y = "Change in Overall Attitude Toward Group Work (OEGW)",
+       title = "No Significant Change in Overall Attitude Toward Group Work") +
+  theme(plot.title = element_text(size = 10),
+    axis.title.x = element_text(size = 10),
+    axis.title.y = element_text(size = 10))
+
+model1 <- lm(change_in_att ~ GroupType, data = atts_change)
+
+model1 %>% 
+  tidy() %>% 
+  kable(digits = 3)
+```
+Pre: mean overall attitudes toward group work  = 3.33
+
+Post: mean overall attitudes toward group work  = 3.39
+
+Not a significant change in overall attitudes toward group work in CS216 based on group type. 
