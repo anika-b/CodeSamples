@@ -1,0 +1,316 @@
+---
+title: "Lab 3 (group)"
+author: "ANM"
+format: pdf
+editor: 
+  markdown: 
+    wrap: 80
+---
+
+```{r load, message=FALSE}
+library(leaps)
+library(tidyverse)
+library(tidymodels)
+library(caret)
+library(MASS)
+library(glmnet)
+
+data <- read_csv("data/superconductors.csv")
+```
+
+## Attempt at all-subset
+
+```{r all-subset selection, eval=FALSE}
+m_all <- regsubsets(critical_temp ~ .,
+                     data = data, 
+                     nbest = 1, nvmax = 81,
+                    really.big =T)
+summary(m_all)
+```
+
+We first attempted all subset selection as a method of variable selection.
+However, due to the size of the dataset this was not an ideal choice. The model
+ran for just 5 variables but failed to run for all 81 variables. It took too
+long and timed out. We then moved on to the method of stepwise selection.
+
+## Attempt at stepwise
+
+We attempted two models, one with every predictor and one with only the weighted
+measurements for each physical property.
+
+**Create the Models:**
+
+```{r creating 3 models, include = F}
+m_none <- lm(critical_temp ~ 1, data = data) #just an average
+summary(m_none)
+m_all <- lm(critical_temp ~ ., data = data) #all plus intercept
+summary(m_all)
+m_wtd_all <- lm(critical_temp ~ wtd_mean_atomic_mass + wtd_gmean_atomic_mass + 
+                wtd_entropy_atomic_mass + wtd_range_atomic_mass + 
+                wtd_std_atomic_mass + wtd_mean_fie + wtd_gmean_fie + 
+                wtd_entropy_fie + wtd_range_fie + wtd_std_fie + 
+                wtd_mean_atomic_radius + wtd_gmean_atomic_radius 
+                + wtd_entropy_atomic_radius + wtd_range_atomic_radius + 
+                wtd_std_atomic_radius + wtd_mean_Density + wtd_gmean_Density + 
+                wtd_entropy_Density + wtd_range_Density + wtd_std_atomic_mass +
+                wtd_mean_FusionHeat + wtd_gmean_FusionHeat + 
+                wtd_entropy_FusionHeat + wtd_range_FusionHeat + 
+                wtd_std_FusionHeat + wtd_mean_ThermalConductivity + 
+                wtd_gmean_ThermalConductivity + wtd_entropy_ThermalConductivity 
+                + wtd_range_ThermalConductivity + wtd_std_ThermalConductivity +
+                wtd_mean_Valence + wtd_gmean_Valence + wtd_entropy_Valence + 
+                wtd_range_Valence + wtd_std_Valence, data = data)
+summary(m_wtd_all)
+```
+
+**Stepwise Selection: All Predictors**
+
+```{r stepwise selection on all predictors, include = F}
+stepAIC(m_none, 
+        scope = list(lower = m_none, upper = m_all),
+        data = data, direction = 'forward')
+
+##best model!!
+bestmodelall <- lm(formula = critical_temp ~ wtd_std_ThermalConductivity + 
+                wtd_gmean_ElectronAffinity + range_atomic_radius + 
+                wtd_std_Valence + wtd_mean_ElectronAffinity + 
+                wtd_std_atomic_radius + wtd_std_ElectronAffinity + 
+                range_ThermalConductivity + range_atomic_mass + 
+                wtd_std_atomic_mass + wtd_std_FusionHeat + 
+                wtd_entropy_ThermalConductivity + entropy_atomic_mass + 
+                std_atomic_radius + std_ElectronAffinity + 
+                range_ElectronAffinity + range_Density + range_Valence + 
+                gmean_ThermalConductivity + wtd_mean_ThermalConductivity + 
+                wtd_gmean_ThermalConductivity + wtd_range_ThermalConductivity + 
+                wtd_range_FusionHeat + gmean_ElectronAffinity +
+                mean_ElectronAffinity + wtd_mean_fie + wtd_entropy_Valence + 
+                wtd_entropy_atomic_radius + wtd_entropy_FusionHeat + 
+                wtd_entropy_Density + gmean_fie + std_ThermalConductivity + 
+                wtd_entropy_atomic_mass + wtd_entropy_ElectronAffinity + 
+                wtd_entropy_fie + wtd_range_ElectronAffinity + wtd_range_fie + 
+                wtd_mean_atomic_radius + wtd_gmean_atomic_radius + std_fie + 
+                gmean_atomic_radius + range_fie + wtd_range_atomic_radius + 
+                std_Density + wtd_std_Density + entropy_Density + 
+                wtd_mean_FusionHeat + wtd_gmean_FusionHeat + 
+                mean_Density + mean_atomic_mass + gmean_Density + 
+                wtd_mean_atomic_mass + number_of_elements + wtd_gmean_Density + 
+                std_atomic_mass + entropy_Valence + range_FusionHeat + 
+                entropy_FusionHeat + mean_FusionHeat + gmean_FusionHeat + 
+                entropy_ThermalConductivity + gmean_atomic_mass + 
+                wtd_gmean_atomic_mass + entropy_fie + entropy_atomic_radius + 
+                wtd_gmean_Valence + gmean_Valence + entropy_ElectronAffinity + 
+                wtd_gmean_fie + mean_atomic_radius + mean_fie + 
+                wtd_mean_Valence, data = data)
+#AIC=28769.57
+
+stepAIC(m_all, 
+        scope = list(lower = m_none, upper = m_all),
+        data = data, direction = 'backward')
+
+bestbackwardall <- lm(formula = critical_temp ~ number_of_elements + mean_atomic_mass + 
+    wtd_mean_atomic_mass + gmean_atomic_mass + wtd_gmean_atomic_mass + 
+    entropy_atomic_mass + range_atomic_mass + std_atomic_mass + 
+    mean_fie + wtd_mean_fie + gmean_fie + wtd_gmean_fie + entropy_fie + 
+    wtd_entropy_fie + range_fie + wtd_range_fie + std_fie + mean_atomic_radius + 
+    wtd_mean_atomic_radius + gmean_atomic_radius + wtd_gmean_atomic_radius + 
+    entropy_atomic_radius + wtd_entropy_atomic_radius + range_atomic_radius + 
+    wtd_range_atomic_radius + wtd_std_atomic_radius + mean_Density + 
+    gmean_Density + wtd_gmean_Density + entropy_Density + wtd_entropy_Density + 
+    range_Density + std_Density + wtd_std_Density + mean_ElectronAffinity + 
+    wtd_mean_ElectronAffinity + gmean_ElectronAffinity + wtd_gmean_ElectronAffinity + 
+    entropy_ElectronAffinity + wtd_entropy_ElectronAffinity + 
+    range_ElectronAffinity + wtd_range_ElectronAffinity + std_ElectronAffinity + 
+    wtd_std_ElectronAffinity + mean_FusionHeat + wtd_mean_FusionHeat + 
+    gmean_FusionHeat + wtd_gmean_FusionHeat + entropy_FusionHeat + 
+    wtd_entropy_FusionHeat + range_FusionHeat + wtd_range_FusionHeat + 
+    wtd_std_FusionHeat + wtd_mean_ThermalConductivity + gmean_ThermalConductivity + 
+    wtd_gmean_ThermalConductivity + entropy_ThermalConductivity + 
+    range_ThermalConductivity + wtd_range_ThermalConductivity + 
+    std_ThermalConductivity + wtd_mean_Valence + gmean_Valence + 
+    wtd_gmean_Valence + entropy_Valence + wtd_entropy_Valence + 
+    range_Valence + wtd_std_Valence, data = data)
+#AIC=28762.7
+```
+
+For the models with all predictors, the best model between forward and backwards
+selection was the backwards selection model. It had a lower AIC (28762.7).
+
+**Stepwise Selection: Weighted Predictors**
+
+```{r stepwise selection on wtd predictors, include = F}
+stepAIC(m_none, 
+        scope = list(lower = m_none, upper = m_wtd_all),
+        data = data, direction = 'forward')
+
+bestmodelwtd <- lm(formula = critical_temp ~ wtd_std_ThermalConductivity + 
+                wtd_entropy_atomic_mass + wtd_std_Valence + wtd_entropy_fie + 
+                wtd_entropy_Density + wtd_entropy_ThermalConductivity + 
+                wtd_std_FusionHeat + wtd_range_FusionHeat + wtd_gmean_Valence + 
+                wtd_range_fie + wtd_std_atomic_radius + wtd_range_Valence + 
+                wtd_std_atomic_mass + wtd_gmean_fie + wtd_entropy_FusionHeat + 
+                wtd_entropy_atomic_radius + wtd_gmean_FusionHeat + 
+                wtd_range_atomic_radius + wtd_mean_FusionHeat + wtd_mean_fie + 
+                wtd_mean_atomic_radius + wtd_gmean_atomic_radius + 
+                wtd_mean_Density + wtd_gmean_Density + wtd_std_fie + 
+                wtd_mean_ThermalConductivity + wtd_gmean_ThermalConductivity + 
+                wtd_range_ThermalConductivity + wtd_entropy_Valence + 
+                wtd_range_Density + wtd_mean_Valence + wtd_range_atomic_mass, 
+                data = data)
+##AIC=29685.03
+
+stepAIC(m_wtd_all, 
+        scope = list(lower = m_none, upper = m_wtd_all),
+        data = data, direction = 'backward')
+
+bestbackwardwtd = lm(formula = critical_temp ~ wtd_gmean_atomic_mass + 
+                  wtd_entropy_atomic_mass + wtd_range_atomic_mass + 
+                  wtd_std_atomic_mass + wtd_mean_fie + wtd_gmean_fie + 
+                  wtd_entropy_fie + wtd_mean_atomic_radius + 
+                  wtd_gmean_atomic_radius + wtd_range_atomic_radius + 
+                  wtd_std_atomic_radius + wtd_mean_Density + wtd_gmean_Density +
+                  wtd_range_Density + wtd_mean_FusionHeat + 
+                 wtd_entropy_FusionHeat + wtd_range_FusionHeat + 
+                 wtd_std_FusionHeat + wtd_mean_ThermalConductivity + 
+                wtd_gmean_ThermalConductivity + wtd_entropy_ThermalConductivity + 
+                wtd_range_ThermalConductivity + wtd_std_ThermalConductivity + 
+                wtd_mean_Valence + wtd_gmean_Valence + wtd_entropy_Valence + 
+                wtd_std_Valence, data = data)
+##AIC = 29678.92
+```
+
+For the models with all the weighted predictors, the best model between forward
+and backwards selection was the backward selection model. It had the lowest AIC
+(29678.92).
+
+Between all of our models chosen by stepwise, the best model was the backwards
+selection model using all predictors (AIC = 28762.7). However, we still wanted
+to formally test if including all predictors was more "helpful" than just the
+weighted predictors.
+
+We conducted a hypothesis test using a significance level of 0.05 to test if
+additionally including all the predictors (instead of just the weighted
+variables) was "helpful" somehow. Our null hypothesis is that all of the slopes
+corresponding to the additional predictors is zero while adjusting for the
+weighted physical property measurements. The alternative hypothesis is that at
+least one of the slopes corresponding to the additional predictors (the non
+weighted ones) is non-zero, while adjusting for the weighted physical property
+measurements. Our f statistic was 27.185 with f distribution and denominator
+degrees of freedom of 4932 and denominator degrees of freedom of 40. Our p value
+is less than 2.2e-16, which is less than a significance value of 0.05. This
+means we reject the null. We have enough evidence to conclude that at least one
+predictor (in the full model with all predictors) has a non-zero slope. This
+shows that the addition of all the predictors is "helpful" in some way. Only
+including the weighted physical property measurements in our model didn't
+actually improve anything, it's better to have all the predictors there.
+
+```{r hypothesis test}
+anova(bestbackwardwtd, bestbackwardall) 
+```
+
+## Attempt at LASSO
+
+```{r lasso}
+y <- data$critical_temp
+x <- model.matrix(critical_temp ~ ., data = data)
+m_lasso_cv <- cv.glmnet(x, y, alpha = 1)
+best_lambda <- m_lasso_cv$lambda.min
+
+m_best <- glmnet(x, y, alpha = 1, lambda = best_lambda)
+m_best$beta
+
+m_lasso <- lm(critical_temp ~ . - wtd_gmean_atomic_mass +
+                wtd_range_atomic_mass -gmean_fie - wtd_gmean_fie -
+                wtd_mean_Density - wtd_std_FusionHeat - mean_Valence -
+                wtd_mean_Valence, data = data)
+```
+
+Here we attempted a LASSO for variable selection. The LASSO resulted with most
+variables being included in the model.
+
+## K-fold Cross Validation
+
+```{r cv}
+set.seed(123)
+cv_method <- trainControl(method = "cv", number = 10)
+cv_lasso <- train(critical_temp ~ . - wtd_gmean_atomic_mass +
+                wtd_range_atomic_mass -gmean_fie - wtd_gmean_fie -
+                wtd_mean_Density - wtd_std_FusionHeat - mean_Valence -
+                wtd_mean_Valence, data = data, method = "lm", 
+                trControl = cv_method)
+##this might need to be a different model ?? see bestbackwardall - that had the lowest AIC out of the stepwise that i did - madison
+cv_step <- train(critical_temp ~ wtd_std_ThermalConductivity + 
+                wtd_entropy_atomic_mass + wtd_std_Valence + wtd_entropy_fie + 
+                wtd_entropy_Density + wtd_entropy_ThermalConductivity + 
+                wtd_std_FusionHeat + wtd_range_FusionHeat + wtd_gmean_Valence + 
+                wtd_range_fie + wtd_std_atomic_radius + wtd_range_Valence + 
+                wtd_std_atomic_mass + wtd_gmean_fie + wtd_entropy_FusionHeat + 
+                wtd_entropy_atomic_radius + wtd_gmean_FusionHeat + 
+                wtd_range_atomic_radius + wtd_mean_FusionHeat + wtd_mean_fie + 
+                wtd_mean_atomic_radius + wtd_gmean_atomic_radius + 
+                wtd_mean_Density + wtd_gmean_Density + wtd_std_fie + 
+                wtd_mean_ThermalConductivity + wtd_gmean_ThermalConductivity + 
+                wtd_range_ThermalConductivity + wtd_entropy_Valence + 
+                wtd_range_Density + wtd_mean_Valence + wtd_range_atomic_mass, 
+                data = data, method = "lm", trControl = cv_method)
+
+print(cv_lasso)
+print(cv_step)
+```
+
+The k-fold cross validation technique was utilized to compare the model with the
+variables from the LASSO and from the forward stepwise selection. The LASSO RMSE
+is 17.78 which is lower than the RMSE of 19.42 for the stepwise variable
+selection. We chose to use the LASSO selected model as the best model because it
+minimizes RMSE.
+
+## Variable Selection Approach
+
+We used an all subset process, stepwise (forward and backward) and LASSO to
+select our variables. To evaluate their performance, we used AIC. We knew that
+inputting all 86 variables into the model would be time consuming, and probably
+wouldn't reflect the model that well. We tested to see if only included the
+weighted measurements of the physical properties was more effective than just
+including all of them. The results of our f-test showed that it was more
+beneficial to include everything, so we followed through with all variables in
+our model for all of our variable selection processes. All subset selection
+didn't end up working, so we compared our stepwise models to our LASSO model. We
+used k-fold cross validation to compare the results of our LASSO model and our
+best backwards selection model (with all predictors). Since the LASSO model has
+a lower RMSE, we moved forward with that version of the model. It also had lower
+number of variables than the model chosen from stepwise selection, which makes
+it easier to interpret.
+
+## Final Model
+
+The LASSO model includes every predictor except wtd_gmean_atomic_mass,
+wtd_range_atomic_mass, gmean_fie, wtd_gmean_fie, wtd_mean_Density,
+wtd_std_FusionHeat, mean_Valence, wtd_mean_Valence. We did not consider any
+interactions or transformations because we lack the field knowledge to
+understand what variables may have interactions.
+
+##Testing assumptions
+
+```{r assumptions}
+
+mlasso_aug <- augment(m_lasso)
+head(augment)
+
+ggplot(mlasso_aug, aes(x = .fitted, y = .resid)) + 
+  geom_point() + 
+  geom_hline(yintercept = 0, color = "darkred") + 
+  labs(x = "Fitted (predicted) value", y = "Residual") + 
+  theme_bw()
+
+ggplot(mlasso_aug, aes(sample = .resid)) +
+stat_qq() +
+stat_qq_line()
+
+```
+
+We assumed that observations are independent, because the properties of one
+superconductor shouldn't affect the properties of another. Based on the Q-Q
+plot, the assumption of normality is not violated as the data mostly falls along
+the line although it does deviate more at the bottom. Linearity is violated
+because the fitted values trend downward as it moves across the x axis. Constant
+variance is also violated because the variance increases as the fitted value
+increases.
